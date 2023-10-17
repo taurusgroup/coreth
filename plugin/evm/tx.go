@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"strings"
 
 	"golang.org/x/exp/slices"
 
@@ -147,6 +148,10 @@ func (tx *Tx) Less(other *Tx) bool {
 	return tx.ID().Hex() < other.ID().Hex()
 }
 
+func (tx *Tx) Cmp(other *Tx) int {
+	return strings.Compare(tx.ID().Hex(), other.ID().Hex())
+}
+
 // Sign this transaction with the provided signers
 func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 	unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedAtomicTx)
@@ -267,8 +272,15 @@ func mergeAtomicOps(txs []*Tx) (map[ids.ID]*atomic.Requests, error) {
 		// with txs initialized from the txID index.
 		copyTxs := make([]*Tx, len(txs))
 		copy(copyTxs, txs)
-		slices.SortFunc(copyTxs, func(i, j *Tx) bool {
-			return i.Less(j)
+		slices.SortFunc(copyTxs, func(i, j *Tx) int {
+			switch {
+			case i.Less(j):
+				return -1
+			case j.Less(i):
+				return 1
+			default:
+				return 0
+			}
 		})
 		txs = copyTxs
 	}
