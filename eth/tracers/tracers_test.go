@@ -92,7 +92,8 @@ func BenchmarkTransactionTrace(b *testing.B) {
 	_, statedb := tests.MakePreState(rawdb.NewMemoryDatabase(), alloc, false)
 	// Create the tracer, the EVM environment and run it
 	tracer := logger.NewStructLogger(&logger.Config{
-		Debug: false,
+		DisableFastTracing: true,
+		Debug:              false,
 		//DisableStorage: true,
 		//EnableMemory: false,
 		//EnableReturnData: false,
