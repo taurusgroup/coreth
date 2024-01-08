@@ -49,12 +49,13 @@ func (s Storage) Copy() Storage {
 
 // Config are the configuration options for structured logger the EVM
 type Config struct {
-	EnableMemory     bool // enable memory capture
-	DisableStack     bool // disable stack capture
-	DisableStorage   bool // disable storage capture
-	EnableReturnData bool // enable return data capture
-	Debug            bool // print output during capture end
-	Limit            int  // maximum length of output, but zero means unlimited
+	EnableMemory       bool // enable memory capture
+	DisableFastTracing bool // disable fast tracing patch
+	DisableStack       bool // disable stack capture
+	DisableStorage     bool // disable storage capture
+	EnableReturnData   bool // enable return data capture
+	Debug              bool // print output during capture end
+	Limit              int  // maximum length of output, but zero means unlimited
 	// Chain overrides, can be used to execute a trace using future fork rules
 	Overrides *params.ChainConfig `json:"overrides,omitempty"`
 }
@@ -171,33 +172,35 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 	}
 
 	stack := scope.Stack
-	for ; l.depth > depth-1; l.depth = l.depth - 1 {
-		i := l.depth - (depth - 1)
-		if l.current.error == nil {
-			switch stack.Data()[len(stack.Data())-i].Bytes32()[31] {
-			case 0x00:
-				l.current.error = fmt.Errorf("call failed")
+	if !l.cfg.DisableFastTracing {
+		for ; l.depth > depth-1; l.depth = l.depth - 1 {
+			i := l.depth - (depth - 1)
+			if l.current.error == nil {
+				switch stack.Data()[len(stack.Data())-i].Bytes32()[31] {
+				case 0x00:
+					l.current.error = fmt.Errorf("call failed")
+				}
 			}
+			l.current = l.current.parent
 		}
-		l.current = l.current.parent
-	}
-	if err != nil {
-		l.current.error = err
-	}
-	switch op {
-	case vm.CALL, vm.DELEGATECALL, vm.STATICCALL, vm.CALLCODE:
-		l.depth = l.depth + 1
-		wl := &wrappedLog{
-			parent: l.current,
-			error:  l.current.error,
+		if err != nil {
+			l.current.error = err
 		}
-		l.current.children = append(l.current.children, wl)
-		l.current = wl
-	case vm.REVERT:
-		l.current.error = vmerrs.ErrExecutionReverted
-		return
-	default:
-		return
+		switch op {
+		case vm.CALL, vm.DELEGATECALL, vm.STATICCALL, vm.CALLCODE:
+			l.depth = l.depth + 1
+			wl := &wrappedLog{
+				parent: l.current,
+				error:  l.current.error,
+			}
+			l.current.children = append(l.current.children, wl)
+			l.current = wl
+		case vm.REVERT:
+			l.current.error = vmerrs.ErrExecutionReverted
+			return
+		default:
+			return
+		}
 	}
 
 	memory := scope.Memory
@@ -251,6 +254,7 @@ func (l *StructLogger) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, s
 	}
 	// create a new snapshot of the EVM.
 	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, rdata, storage, depth, l.env.StateDB.GetRefund(), err}
+	l.logs = append(l.logs, log)
 	l.current.log = log
 }
 
@@ -261,15 +265,17 @@ func (l *StructLogger) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, s
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
 func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, err error) {
-	for ; l.depth > 1; l.depth-- {
-		l.current = l.current.parent
-	}
-	l.current.log = StructLog{
-		Op:         vm.CALL,
-		GasCost:    gasUsed,
-		ReturnData: output,
-		Depth:      0,
-		Err:        err,
+	if !l.cfg.DisableFastTracing {
+		for ; l.depth > 1; l.depth-- {
+			l.current = l.current.parent
+		}
+		l.current.log = StructLog{
+			Op:         vm.CALL,
+			GasCost:    gasUsed,
+			ReturnData: output,
+			Depth:      0,
+			Err:        err,
+		}
 	}
 	l.output = output
 	l.err = err
@@ -333,7 +339,12 @@ func (l *wrappedLog) getLogs() []StructLog {
 }
 
 // StructLogs returns the captured log entries.
-func (l *StructLogger) StructLogs() []StructLog { return l.current.getLogs() }
+func (l *StructLogger) StructLogs() []StructLog {
+	if l.cfg.DisableFastTracing {
+		return l.logs
+	}
+	return l.current.getLogs()
+}
 
 // Error returns the VM error captured by the trace.
 func (l *StructLogger) Error() error { return l.err }
