@@ -47,7 +47,7 @@ func (d *dummyContractRef) Balance() *big.Int          { return new(big.Int) }
 
 func TestStoreCapture(t *testing.T) {
 	var (
-		logger     = NewStructLogger(nil)
+		logger     = NewStructLogger(&Config{DisableFastTracing: true})
 		statedb, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		env        = vm.NewEVM(vm.BlockContext{}, vm.TxContext{}, statedb, params.TestChainConfig, vm.Config{Tracer: logger})
 		contract   = vm.NewContract(&dummyContractRef{}, &dummyContractRef{}, new(big.Int), 100000)
