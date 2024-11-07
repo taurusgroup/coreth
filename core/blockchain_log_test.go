@@ -36,13 +36,13 @@ func TestAcceptedLogsSubscription(t *testing.T) {
 	)
 	var (
 		require = require.New(t)
-		engine  = dummy.NewFaker()
+		engine  = dummy.NewCoinbaseFaker()
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
 		funds   = new(big.Int).Mul(big.NewInt(100), big.NewInt(params.Ether))
 		gspec   = &Genesis{
 			Config:  params.TestChainConfig,
-			Alloc:   GenesisAlloc{addr1: {Balance: funds}},
+			Alloc:   types.GenesisAlloc{addr1: {Balance: funds}},
 			BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
 		}
 		contractAddress = crypto.CreateAddress(addr1, 0)
