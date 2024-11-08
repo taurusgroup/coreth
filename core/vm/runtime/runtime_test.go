@@ -671,7 +671,9 @@ func TestColdAccountAccessCost(t *testing.T) {
 			want: 7600,
 		},
 	} {
-		tracer := logger.NewStructLogger(nil)
+		tracer := logger.NewStructLogger(&logger.Config{
+			DisableFastTracing: true,
+		})
 		Execute(tc.code, nil, &Config{
 			EVMConfig: vm.Config{
 				Tracer: tracer,
