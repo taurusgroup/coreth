@@ -330,7 +330,7 @@ func TestTraceCall(t *testing.T) {
 				To:    &accounts[0].addr,
 				Value: (*hexutil.Big)(new(big.Int).Add(big.NewInt(params.Ether), big.NewInt(100))),
 			},
-			config: nil,
+			config: defaultCfg,
 			expect: `{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}`,
 		},
 		// Before the first transaction, should be failed
@@ -363,7 +363,14 @@ func TestTraceCall(t *testing.T) {
 				To:    &accounts[0].addr,
 				Value: (*hexutil.Big)(new(big.Int).Add(big.NewInt(params.Ether), big.NewInt(100))),
 			},
-			config:    &TraceCallConfig{TxIndex: uintPtr(2)},
+			config: &TraceCallConfig{
+				TraceConfig: TraceConfig{
+					Config: &logger.Config{
+						DisableFastTracing: true,
+					},
+				},
+				TxIndex: uintPtr(2),
+			},
 			expectErr: nil,
 			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}`,
 		},
