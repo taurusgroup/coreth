@@ -282,6 +282,15 @@ func TestTraceCall(t *testing.T) {
 
 	defer backend.teardown()
 	api := NewAPI(backend)
+
+	defaultCfg := &TraceCallConfig{
+		TraceConfig: TraceConfig{
+			Config: &logger.Config{
+				DisableFastTracing: true,
+			},
+		},
+	}
+
 	var testSuite = []struct {
 		blockNumber rpc.BlockNumber
 		call        ethapi.TransactionArgs
@@ -297,7 +306,7 @@ func TestTraceCall(t *testing.T) {
 				To:    &accounts[1].addr,
 				Value: (*hexutil.Big)(big.NewInt(1000)),
 			},
-			config:    nil,
+			config:    defaultCfg,
 			expectErr: nil,
 			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}`,
 		},
@@ -309,7 +318,7 @@ func TestTraceCall(t *testing.T) {
 				To:    &accounts[1].addr,
 				Value: (*hexutil.Big)(big.NewInt(1000)),
 			},
-			config:    nil,
+			config:    defaultCfg,
 			expectErr: nil,
 			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}`,
 		},
@@ -366,7 +375,7 @@ func TestTraceCall(t *testing.T) {
 				To:    &accounts[1].addr,
 				Value: (*hexutil.Big)(big.NewInt(1000)),
 			},
-			config:    nil,
+			config:    defaultCfg,
 			expectErr: fmt.Errorf("block #%d not found", genBlocks+1),
 			//expect:    nil,
 		},
@@ -378,7 +387,7 @@ func TestTraceCall(t *testing.T) {
 				To:    &accounts[1].addr,
 				Value: (*hexutil.Big)(big.NewInt(1000)),
 			},
-			config:    nil,
+			config:    defaultCfg,
 			expectErr: nil,
 			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}`,
 		},
@@ -390,7 +399,7 @@ func TestTraceCall(t *testing.T) {
 				To:    &accounts[1].addr,
 				Value: (*hexutil.Big)(big.NewInt(1000)),
 			},
-			config:    nil,
+			config:    defaultCfg,
 			expectErr: errors.New("tracing on top of pending is not supported"),
 		},
 		{
@@ -400,6 +409,11 @@ func TestTraceCall(t *testing.T) {
 				Input: &hexutil.Bytes{0x43}, // blocknumber
 			},
 			config: &TraceCallConfig{
+				TraceConfig: TraceConfig{
+					Config: &logger.Config{
+						DisableFastTracing: true,
+					},
+				},
 				BlockOverrides: &ethapi.BlockOverrides{Number: (*hexutil.Big)(big.NewInt(0x1337))},
 			},
 			expectErr: nil,
@@ -469,7 +483,11 @@ func TestTraceTransaction(t *testing.T) {
 	})
 	defer backend.chain.Stop()
 	api := NewAPI(backend)
-	result, err := api.TraceTransaction(context.Background(), target, nil)
+	result, err := api.TraceTransaction(context.Background(), target, &TraceConfig{
+		Config: &logger.Config{
+			DisableFastTracing: true,
+		},
+	})
 	if err != nil {
 		t.Errorf("Failed to trace transaction %v", err)
 	}
@@ -528,6 +546,12 @@ func TestTraceBlock(t *testing.T) {
 	defer backend.chain.Stop()
 	api := NewAPI(backend)
 
+	defaultCfg := &TraceConfig{
+		Config: &logger.Config{
+			DisableFastTracing: true,
+		},
+	}
+
 	var testSuite = []struct {
 		blockNumber rpc.BlockNumber
 		config      *TraceConfig
@@ -537,26 +561,31 @@ func TestTraceBlock(t *testing.T) {
 		// Trace genesis block, expect error
 		{
 			blockNumber: rpc.BlockNumber(0),
+			config:      defaultCfg,
 			expectErr:   errors.New("genesis is not traceable"),
 		},
 		// Trace head block
 		{
 			blockNumber: rpc.BlockNumber(genBlocks),
+			config:      defaultCfg,
 			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHash),
 		},
 		// Trace non-existent block
 		{
 			blockNumber: rpc.BlockNumber(genBlocks + 1),
+			config:      defaultCfg,
 			expectErr:   fmt.Errorf("block #%d not found", genBlocks+1),
 		},
 		// Trace latest block
 		{
 			blockNumber: rpc.LatestBlockNumber,
+			config:      defaultCfg,
 			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHash),
 		},
 		// Trace pending block
 		{
 			blockNumber: rpc.PendingBlockNumber,
+			config:      defaultCfg,
 			want:        fmt.Sprintf(`[{"txHash":"%v","result":{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}}]`, txHash),
 		},
 	}
@@ -995,8 +1024,18 @@ func TestTraceChain(t *testing.T) {
 		end    uint64
 		config *TraceConfig
 	}{
-		{0, 50, nil},  // the entire chain range, blocks [1, 50]
-		{10, 20, nil}, // the middle chain range, blocks [11, 20]
+		// the entire chain range, blocks [1, 50]
+		{0, 50, &TraceConfig{
+			Config: &logger.Config{
+				DisableFastTracing: true,
+			},
+		}},
+		// the middle chain range, blocks [11, 20]
+		{10, 20, &TraceConfig{
+			Config: &logger.Config{
+				DisableFastTracing: true,
+			},
+		}},
 	}
 	for _, c := range cases {
 		ref.Store(0)
