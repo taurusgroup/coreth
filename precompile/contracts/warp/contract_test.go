@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/precompile/contract"
 	"github.com/ava-labs/coreth/precompile/testutils"
@@ -153,7 +152,7 @@ func TestSendWarpMessage(t *testing.T) {
 				topics := logsTopics[0]
 				require.Len(t, topics, 3)
 				require.Equal(t, topics[0], WarpABI.Events["SendWarpMessage"].ID)
-				require.Equal(t, topics[1], callerAddr.Hash())
+				require.Equal(t, topics[1], common.BytesToHash(callerAddr[:]))
 				require.Equal(t, topics[2], common.Hash(unsignedWarpMessage.ID()))
 
 				require.Len(t, logsData, 1)

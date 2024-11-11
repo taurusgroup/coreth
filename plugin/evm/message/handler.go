@@ -12,9 +12,8 @@ import (
 )
 
 var (
-	_ GossipHandler            = NoopMempoolGossipHandler{}
-	_ RequestHandler           = NoopRequestHandler{}
-	_ CrossChainRequestHandler = NoopCrossChainRequestHandler{}
+	_ GossipHandler  = NoopMempoolGossipHandler{}
+	_ RequestHandler = NoopRequestHandler{}
 )
 
 // GossipHandler handles incoming gossip messages
@@ -36,7 +35,7 @@ func (NoopMempoolGossipHandler) HandleEthTxs(nodeID ids.NodeID, msg EthTxsGossip
 }
 
 // RequestHandler interface handles incoming requests from peers
-// Must have methods in format of handleType(context.Context, ids.ShortID, uint32, request Type) error
+// Must have methods in format of handleType(context.Context, ids.NodeID, uint32, request Type) error
 // so that the Request object of relevant Type can invoke its respective handle method
 // on this struct.
 // Also see GossipHandler for implementation style.
@@ -81,16 +80,5 @@ func (NoopRequestHandler) HandleMessageSignatureRequest(ctx context.Context, nod
 }
 
 func (NoopRequestHandler) HandleBlockSignatureRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, signatureRequest BlockSignatureRequest) ([]byte, error) {
-	return nil, nil
-}
-
-// CrossChainRequestHandler interface handles incoming requests from another chain
-type CrossChainRequestHandler interface {
-	HandleEthCallRequest(ctx context.Context, requestingchainID ids.ID, requestID uint32, ethCallRequest EthCallRequest) ([]byte, error)
-}
-
-type NoopCrossChainRequestHandler struct{}
-
-func (NoopCrossChainRequestHandler) HandleEthCallRequest(ctx context.Context, requestingchainID ids.ID, requestID uint32, ethCallRequest EthCallRequest) ([]byte, error) {
 	return nil, nil
 }

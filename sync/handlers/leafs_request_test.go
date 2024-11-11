@@ -13,23 +13,22 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/ethdb"
-	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
 	"github.com/ava-labs/coreth/sync/syncutils"
 	"github.com/ava-labs/coreth/trie"
+	"github.com/ava-labs/coreth/triedb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	rand.Seed(1)
 	mockHandlerStats := &stats.MockHandlerStats{}
-	memdb := memorydb.New()
-	trieDB := trie.NewDatabase(memdb)
+	memdb := rawdb.NewMemoryDatabase()
+	trieDB := triedb.NewDatabase(memdb, nil)
 
 	corruptedTrieRoot, _, _ := syncutils.GenerateTrie(t, trieDB, 100, common.HashLength)
 	tr, err := trie.New(trie.TrieID(corruptedTrieRoot), trieDB)
@@ -494,15 +493,12 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					}
 					// modify one entry of 1 in 4 segments
 					if i%(segmentLen*4) == 0 {
-						var acc snapshot.Account
-						if err := rlp.DecodeBytes(it.Account(), &acc); err != nil {
+						acc, err := types.FullAccount(it.Account())
+						if err != nil {
 							t.Fatalf("could not parse snapshot account: %v", err)
 						}
 						acc.Nonce++
-						bytes, err := rlp.EncodeToBytes(acc)
-						if err != nil {
-							t.Fatalf("coult not encode snapshot account to bytes: %v", err)
-						}
+						bytes := types.SlimAccountRLP(*acc)
 						rawdb.WriteAccountSnapshot(memdb, it.Hash(), bytes)
 					}
 					i++
@@ -704,19 +700,16 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 func assertRangeProofIsValid(t *testing.T, request *message.LeafsRequest, response *message.LeafsResponse, expectMore bool) {
 	t.Helper()
 
-	var start, end []byte
+	var start []byte
 	if len(request.Start) == 0 {
 		start = bytes.Repeat([]byte{0x00}, common.HashLength)
 	} else {
 		start = request.Start
 	}
-	if len(response.Keys) > 0 {
-		end = response.Keys[len(response.Vals)-1]
-	}
 
 	var proof ethdb.Database
 	if len(response.ProofVals) > 0 {
-		proof = memorydb.New()
+		proof = rawdb.NewMemoryDatabase()
 		defer proof.Close()
 		for _, proofVal := range response.ProofVals {
 			proofKey := crypto.Keccak256(proofVal)
@@ -726,7 +719,7 @@ func assertRangeProofIsValid(t *testing.T, request *message.LeafsRequest, respon
 		}
 	}
 
-	more, err := trie.VerifyRangeProof(request.Root, start, end, response.Keys, response.Vals, proof)
+	more, err := trie.VerifyRangeProof(request.Root, start, response.Keys, response.Vals, proof)
 	assert.NoError(t, err)
 	assert.Equal(t, expectMore, more)
 }
